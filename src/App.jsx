@@ -87,7 +87,7 @@ const WORKOUTS = {
   },
 };
 
-const SYSTEM_PROMPT = `You are an elite personal fitness coach for Peak.AI. You have complete knowledge of this athlete's profile:
+const SYSTEM_PROMPT = `You are an elite personal fitness coach for PEAK. You have complete knowledge of this athlete's profile:
 
 ATHLETE PROFILE:
 - Age: 30, Height: 171cm, Weight: 72.4kg
@@ -1648,7 +1648,7 @@ function CoachDashboard({ user, onSignOut }) {
             <div style={{ background: "rgba(10,10,10,0.85)", borderRadius: 20, padding: 24, border: "1px solid #2a2a2a", textAlign: "center" }}>
               <div style={{ width: 72, height: 72, borderRadius: "50%", background: "linear-gradient(135deg, #e84040, #e8a020)", margin: "0 auto 14px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>🏃</div>
               <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 2 }}>{profile?.full_name || user?.email?.split("@")[0] || "Athlete"}</div>
-              <div style={{ fontSize: 12, color: "#888", letterSpacing: 2, textTransform: "uppercase", marginBottom: 8 }}>Peak.AI Athlete</div>
+              <div style={{ fontSize: 12, color: "#888", letterSpacing: 2, textTransform: "uppercase", marginBottom: 8 }}>PEAK Athlete</div>
               <div style={{ fontSize: 11, color: "#555" }}>{user?.email}</div>
             </div>
 
