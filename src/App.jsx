@@ -379,6 +379,117 @@ function LandingPage({ onEnter }) {
 
 // ─── COACH DASHBOARD ─────────────────────────────────────────────────────────
 
+// ─── WHOOP CONFIG ────────────────────────────────────────────────────────────
+const WHOOP_CLIENT_ID = "2363c69c-50ed-4a39-8073-19d84481c458";
+const WHOOP_REDIRECT_URI = "https://peak-ai.vercel.app/whoop/callback";
+const WHOOP_SCOPES = "read:recovery read:cycles read:sleep read:workout read:profile offline";
+
+const WHOOP_AUTH_URL = `https://api.prod.whoop.com/oauth/oauth2/auth?client_id=${WHOOP_CLIENT_ID}&redirect_uri=${encodeURIComponent(WHOOP_REDIRECT_URI)}&response_type=code&scope=${encodeURIComponent(WHOOP_SCOPES)}`;
+
+// ─── WHOOP CONNECT ────────────────────────────────────────────────────────────
+function WhoopConnect({ user }) {
+  const [connected, setConnected] = useState(false);
+  const [whoopData, setWhoopData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+    checkConnection();
+  }, [user]);
+
+  const checkConnection = async () => {
+    setLoading(true);
+    const { data } = await supabase.from("whoop_tokens").select("*").eq("user_id", user.id).single();
+    if (data) {
+      setConnected(true);
+      fetchWhoopData(data.access_token);
+    }
+    setLoading(false);
+  };
+
+  const fetchWhoopData = async (token) => {
+    try {
+      const [recoveryRes, sleepRes, cycleRes] = await Promise.all([
+        fetch("https://api.prod.whoop.com/developer/v1/recovery?limit=1", { headers: { Authorization: `Bearer ${token}` } }),
+        fetch("https://api.prod.whoop.com/developer/v1/activity/sleep?limit=1", { headers: { Authorization: `Bearer ${token}` } }),
+        fetch("https://api.prod.whoop.com/developer/v1/cycle?limit=1", { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+      const recovery = recoveryRes.ok ? await recoveryRes.json() : null;
+      const sleep = sleepRes.ok ? await sleepRes.json() : null;
+      const cycle = cycleRes.ok ? await cycleRes.json() : null;
+      setWhoopData({
+        recovery: recovery?.records?.[0]?.score?.recovery_score,
+        hrv: recovery?.records?.[0]?.score?.hrv_rmssd_milli,
+        restingHr: recovery?.records?.[0]?.score?.resting_heart_rate,
+        sleepPerf: sleep?.records?.[0]?.score?.sleep_performance_percentage,
+        strain: cycle?.records?.[0]?.score?.strain,
+      });
+    } catch (e) {
+      console.log("Whoop fetch error:", e);
+    }
+  };
+
+  const disconnect = async () => {
+    await supabase.from("whoop_tokens").delete().eq("user_id", user.id);
+    setConnected(false);
+    setWhoopData(null);
+  };
+
+  const getRecoveryColor = (score) => score >= 67 ? "#40c080" : score >= 34 ? "#e8a020" : "#e84040";
+
+  if (loading) return (
+    <div style={{ padding: "16px 0", display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ fontSize: 20 }}>⌚</div>
+      <div style={{ fontSize: 13, color: "#555" }}>Checking Whoop connection...</div>
+    </div>
+  );
+
+  return (
+    <div style={{ paddingBottom: 16, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, paddingTop: 4 }}>
+        <div style={{ fontSize: 20 }}>⌚</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>Whoop</div>
+          <div style={{ fontSize: 11, color: connected ? "#40c080" : "#555", marginTop: 2 }}>
+            {connected ? "Connected" : "Recovery & sleep tracking"}
+          </div>
+        </div>
+        {connected ? (
+          <button onClick={disconnect} style={{
+            background: "transparent", border: "1px solid #333", borderRadius: 8,
+            padding: "6px 14px", color: "#555", fontSize: 11, cursor: "pointer",
+            fontFamily: "inherit", letterSpacing: 1,
+          }}>Disconnect</button>
+        ) : (
+          <button onClick={() => window.location.href = WHOOP_AUTH_URL} style={{
+            background: "#40c080", border: "none", borderRadius: 8,
+            padding: "8px 16px", color: "#000", fontSize: 11, fontWeight: 700,
+            cursor: "pointer", fontFamily: "inherit", letterSpacing: 1,
+          }}>Connect</button>
+        )}
+      </div>
+
+      {/* Live Whoop data */}
+      {connected && whoopData && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 14 }}>
+          {[
+            { label: "Recovery", value: whoopData.recovery ? `${Math.round(whoopData.recovery)}%` : "—", color: whoopData.recovery ? getRecoveryColor(whoopData.recovery) : "#555" },
+            { label: "HRV", value: whoopData.hrv ? `${Math.round(whoopData.hrv)}ms` : "—", color: "#4080e8" },
+            { label: "Resting HR", value: whoopData.restingHr ? `${whoopData.restingHr}bpm` : "—", color: "#e8a020" },
+            { label: "Sleep", value: whoopData.sleepPerf ? `${Math.round(whoopData.sleepPerf)}%` : "—", color: "#a040e8" },
+            { label: "Strain", value: whoopData.strain ? whoopData.strain.toFixed(1) : "—", color: "#e84040" },
+          ].map(stat => (
+            <div key={stat.label} style={{ background: "rgba(255,255,255,0.04)", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: stat.color }}>{stat.value}</div>
+              <div style={{ fontSize: 9, color: "#555", letterSpacing: 1, textTransform: "uppercase", marginTop: 2 }}>{stat.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── STREAK TRACKER ──────────────────────────────────────────────────────────
 function StreakTracker({ workoutHistory }) {
   const today = new Date();
@@ -624,7 +735,29 @@ function MealLogger({ mealLogs, todayNutrition, animateIn, onAddMeal, onDeleteMe
 }
 
 // ─── RECOVERY TRACKER ────────────────────────────────────────────────────────
-function RecoveryTracker({ sleepLogs, recoveryLogs, animateIn, onLogSleep, onLogRecovery }) {
+function RecoveryTracker({ sleepLogs, recoveryLogs, animateIn, onLogSleep, onLogRecovery, user }) {
+  const [whoopToken, setWhoopToken] = useState(null);
+  const [whoopRecovery, setWhoopRecovery] = useState(null);
+  const [whoopSleep, setWhoopSleep] = useState(null);
+
+  useEffect(() => {
+    if (!user) return;
+    loadWhoopData();
+  }, [user]);
+
+  const loadWhoopData = async () => {
+    const { data: tokenData } = await supabase.from("whoop_tokens").select("*").eq("user_id", user.id).single();
+    if (!tokenData) return;
+    setWhoopToken(tokenData);
+    try {
+      const [rRes, sRes] = await Promise.all([
+        fetch("https://api.prod.whoop.com/developer/v1/recovery?limit=1", { headers: { Authorization: `Bearer ${tokenData.access_token}` } }),
+        fetch("https://api.prod.whoop.com/developer/v1/activity/sleep?limit=1", { headers: { Authorization: `Bearer ${tokenData.access_token}` } }),
+      ]);
+      if (rRes.ok) { const d = await rRes.json(); setWhoopRecovery(d?.records?.[0]); }
+      if (sRes.ok) { const d = await sRes.json(); setWhoopSleep(d?.records?.[0]); }
+    } catch (e) { console.log("Whoop error:", e); }
+  };
   const [sleepHours, setSleepHours] = useState("");
   const [sleepQuality, setSleepQuality] = useState(3);
   const [recoveryScore, setRecoveryScore] = useState(70);
@@ -665,6 +798,33 @@ function RecoveryTracker({ sleepLogs, recoveryLogs, animateIn, onLogSleep, onLog
 
   return (
     <div style={{ padding: "0 24px", display: "flex", flexDirection: "column", gap: 14, opacity: animateIn ? 1 : 0, transition: "all 0.5s ease 0.2s" }}>
+
+      {/* Whoop Live Data Banner */}
+      {whoopToken && whoopRecovery && (
+        <div style={{ background: "rgba(64,192,128,0.08)", borderRadius: 20, padding: 20, border: "1px solid rgba(64,192,128,0.2)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+            <div style={{ fontSize: 16 }}>⌚</div>
+            <div style={{ fontSize: 11, letterSpacing: 3, color: "#40c080", textTransform: "uppercase" }}>Live from Whoop</div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+            {[
+              { label: "Recovery", value: `${Math.round(whoopRecovery.score?.recovery_score || 0)}%`, color: whoopRecovery.score?.recovery_score >= 67 ? "#40c080" : whoopRecovery.score?.recovery_score >= 34 ? "#e8a020" : "#e84040" },
+              { label: "HRV", value: `${Math.round(whoopRecovery.score?.hrv_rmssd_milli || 0)}ms`, color: "#4080e8" },
+              { label: "Resting HR", value: `${whoopRecovery.score?.resting_heart_rate || "—"}bpm`, color: "#e8a020" },
+            ].map(s => (
+              <div key={s.label} style={{ background: "rgba(0,0,0,0.3)", borderRadius: 12, padding: 12, textAlign: "center" }}>
+                <div style={{ fontSize: 18, fontWeight: 800, color: s.color }}>{s.value}</div>
+                <div style={{ fontSize: 9, color: "#555", letterSpacing: 1, textTransform: "uppercase", marginTop: 3 }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+          {whoopSleep && (
+            <div style={{ marginTop: 10, fontSize: 12, color: "#888", textAlign: "center" }}>
+              Sleep performance: <span style={{ color: "#a040e8", fontWeight: 700 }}>{Math.round(whoopSleep.score?.sleep_performance_percentage || 0)}%</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Recovery Score */}
       <div style={{ background: "rgba(10,10,10,0.85)", borderRadius: 20, padding: 24, border: `1px solid ${getRecoveryColor(todayRecovery?.score || recoveryScore)}33` }}>
@@ -1605,6 +1765,7 @@ function CoachDashboard({ user, onSignOut }) {
             sleepLogs={sleepLogs}
             recoveryLogs={recoveryLogs}
             animateIn={animateIn}
+            user={user}
             onLogSleep={async (entry) => {
               if (!user) return;
               const today = new Date().toISOString().split("T")[0];
@@ -1705,20 +1866,33 @@ function CoachDashboard({ user, onSignOut }) {
             {/* Integrations */}
             <div style={{ background: "rgba(10,10,10,0.85)", borderRadius: 20, padding: 24, border: "1px solid #2a2a2a" }}>
               <div style={{ fontSize: 11, letterSpacing: 3, color: "#888", textTransform: "uppercase", marginBottom: 16 }}>Integrations</div>
-              {[
-                { label: "Whoop", icon: "⌚", status: "Coming soon", color: "#e8a020" },
-                { label: "MyFitnessPal", icon: "🍎", status: "Coming soon", color: "#4080e8" },
-              ].map(item => (
-                <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                  <div style={{ fontSize: 20 }}>{item.icon}</div>
-                  <div style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{item.label}</div>
-                  <div style={{ fontSize: 11, color: item.color, fontWeight: 700, letterSpacing: 1 }}>{item.status}</div>
+
+              {/* Whoop */}
+              <WhoopConnect user={user} />
+
+              {/* MyFitnessPal */}
+              <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "16px 0", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                <div style={{ fontSize: 20 }}>🍎</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>MyFitnessPal</div>
+                  <div style={{ fontSize: 11, color: "#555", marginTop: 2 }}>Nutrition tracking integration</div>
                 </div>
-              ))}
+                <div style={{ fontSize: 11, color: "#4080e8", fontWeight: 700, letterSpacing: 1 }}>Coming soon</div>
+              </div>
+
+              {/* InBody */}
+              <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "16px 0", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                <div style={{ fontSize: 20 }}>⚖️</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>InBody</div>
+                  <div style={{ fontSize: 11, color: "#555", marginTop: 2 }}>Body composition scan sync</div>
+                </div>
+                <div style={{ fontSize: 11, color: "#40c080", fontWeight: 700, letterSpacing: 1 }}>Elite</div>
+              </div>
             </div>
 
             <div style={{ textAlign: "center", padding: "8px 0 20px" }}>
-              <div style={{ fontSize: 11, color: "#444", letterSpacing: 2, marginBottom: 16 }}>PEAK.AI · V1.0</div>
+              <div style={{ fontSize: 11, color: "#444", letterSpacing: 2, marginBottom: 16 }}>PEAK · V1.0</div>
               <button onClick={async () => { await supabase.auth.signOut(); onSignOut(); }} style={{
                 background: "transparent", border: "1px solid #333", borderRadius: 12,
                 padding: "12px 32px", color: "#666", fontSize: 12, letterSpacing: 2,
