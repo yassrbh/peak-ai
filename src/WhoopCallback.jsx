@@ -3,7 +3,7 @@ import { supabase } from "./supabase";
 
 const WHOOP_CLIENT_ID = "2363c69c-50ed-4a39-8073-19d84481c458";
 const WHOOP_CLIENT_SECRET = "fd609a6a3cf64f75800cbba511a52eb6219c11bc0db616916c59f4ab38b8c655";
-const REDIRECT_URI = "https://peak-ai.vercel.app/whoop/callback";
+const REDIRECT_URI = "https://peak-ai-seven.vercel.app/whoop/callback";
 
 export default function WhoopCallback() {
   const [status, setStatus] = useState("Connecting your Whoop...");

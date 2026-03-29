@@ -381,7 +381,7 @@ function LandingPage({ onEnter }) {
 
 // ─── WHOOP CONFIG ────────────────────────────────────────────────────────────
 const WHOOP_CLIENT_ID = "2363c69c-50ed-4a39-8073-19d84481c458";
-const WHOOP_REDIRECT_URI = "https://peak-ai.vercel.app/whoop/callback";
+const WHOOP_REDIRECT_URI = "https://peak-ai-seven.vercel.app/whoop/callback";
 const WHOOP_SCOPES = "read:recovery read:cycles read:sleep read:workout read:profile offline";
 
 const WHOOP_AUTH_URL = `https://api.prod.whoop.com/oauth/oauth2/auth?client_id=${WHOOP_CLIENT_ID}&redirect_uri=${encodeURIComponent(WHOOP_REDIRECT_URI)}&response_type=code&scope=${encodeURIComponent(WHOOP_SCOPES)}`;
